@@ -1,0 +1,68 @@
+import { ethers } from "hardhat";
+import { Contract, Signer } from "ethers";
+import { FactoryBoT, DeviceBoT } from "../typechain-types";
+
+import { expect } from "chai";
+
+import hre from "hardhat";
+
+describe("FactoryBoT", function () {
+  let factoryBot: FactoryBoT;
+  let owner: Signer;
+  let ownerAddress: string;
+
+  before(async function () {
+    [owner] = await ethers.getSigners();
+    ownerAddress = await owner.getAddress();
+
+    const _FactoryBoT = await hre.ethers.getContractFactory("FactoryBoT");
+    factoryBot = await _FactoryBoT.deploy();
+
+    console.log("FactoryBoT deployed to:", await factoryBot.getAddress());
+  });
+
+  describe("Deployment", function () {
+    it("Should set the right owner", async function () {
+      console.log("Owner:", await factoryBot.owner());
+      console.log("ownerAddress:", ownerAddress);
+
+      expect(await factoryBot.owner()).to.equal(ownerAddress);
+    });
+  });
+
+  describe("Create device", function () {
+    it("Should create a new device and return its address", async function () {
+      const tx = await factoryBot.createDevice(
+        BigInt(3600),
+        BigInt(1000),
+        "this is a test contract",
+        ownerAddress
+      );
+      
+      const receipt = await tx.wait();
+      
+      if (receipt && receipt.logs) {
+        const event = receipt.logs.find(
+          (log) => log.fragment && log.fragment.name === 'DeviceCreated'
+        );
+        
+        if (event && event.args) {
+          const deviceAddress = event.args[0];
+          console.log("Created Device Address:", deviceAddress);
+          
+          // You can add an assertion here to ensure the device was created
+          expect(deviceAddress).to.be.properAddress;
+          
+          // You can also check if the device is in the devices array
+          const isInDevices = await factoryBot.devices(0);
+          expect(isInDevices).to.equal(deviceAddress);
+        } else {
+          throw new Error("DeviceCreated event not found in transaction receipt");
+        }
+      } else {
+        throw new Error("Transaction receipt or logs not available");
+      }
+    });
+  });
+
+});

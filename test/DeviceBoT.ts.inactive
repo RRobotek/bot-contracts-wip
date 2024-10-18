@@ -1,0 +1,100 @@
+import { ethers } from "hardhat";
+import { Contract, Signer } from "ethers";
+import { DeviceBoT } from "../typechain-types";
+
+
+import hre from "hardhat";
+
+
+describe("DeviceBoT Deployment", function () {
+  let owner: Signer;
+  let client: Signer;
+  let device: DeviceBoT;
+
+  before(async function () {
+    [owner, client] = await ethers.getSigners();
+    
+
+    const _DeviceBoT = await hre.ethers.getContractFactory("DeviceBoT");
+    device = await _DeviceBoT.deploy(BigInt(3600), BigInt(1000), "this is a test contract", owner.getAddress());
+
+    console.log(`Deployed to ${await device.getAddress()}`);
+  });
+
+  it("Get info test test", async function () {
+    let chunkDuration = await device.chunkDuration();
+    let chunkPrice = await device.chunkPrice();
+    let ownerAddress = await device.owner();
+    let metadata = await device.metadata();
+    let startTimestamp = await device.startTimestamp();
+
+    console.log(`Chunk duration: ${chunkDuration}`);
+    console.log(`Chunk price: ${chunkPrice}`);
+    console.log(`Owner address: ${ownerAddress}`);
+    console.log(`Metadata: ${metadata}`);
+    console.log(`Start timestamp: ${startTimestamp}`);
+  });
+
+  it("Subscribe to device", async function () {
+    let subscription_expiration_before = await device.subscription(owner.getAddress());
+    console.log(`Subscription expiration (before): ${subscription_expiration_before}`);
+
+    let chunkDuration = await device.chunkDuration();
+    let chunkPrice = await device.chunkPrice();
+
+    let duration = BigInt(3600);
+    let value = chunkPrice * duration / chunkDuration; 
+
+    console.log(`Subscribing for ${duration} seconds with value ${value}`);
+
+    let expectedPayment = await device.getExpectedPayment(duration);
+    console.log(`Expected payment: ${expectedPayment}`);
+
+    const latestBlock = await ethers.provider.getBlock("latest")
+    const tsBeforeSub = latestBlock?.timestamp;
+
+
+    try {
+      let tx = await device.subscribe(duration, { value: value });
+      let receipt = await tx.wait();
+      console.log(`Subscribed for ${duration} seconds with value ${value}`);
+    } catch (error) {
+      console.error("Error details:", error);
+      throw error;
+    }
+
+    let subscription_expiration_after = await device.subscription(owner.getAddress());
+    console.log(`Subscription expiration (after): ${subscription_expiration_after}`);
+
+    if(tsBeforeSub != null) {
+      const tsDiff = subscription_expiration_after - BigInt(tsBeforeSub);
+      console.log(`Subscribed for ${tsDiff} seconds`);
+    }
+  });
+
+  it("Get Key (before generation)", async function () {
+    try {
+      let key = await device.getKey();
+      console.log("Key:", key);
+    } catch (error) {
+      console.error("Error details:", error);
+    }
+
+  });
+
+  it("Gen key and get key", async function () {
+    await device.generateKey();
+    let key = await device.getKey();
+
+    console.log("Key:", key);
+  });
+
+
+
+  it("Get key (after generation)", async function () {
+    let key = await device.getKey();
+    console.log("Key:", key);
+  });
+
+});
+
